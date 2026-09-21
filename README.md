@@ -121,7 +121,7 @@ cp application-local.yml.example application-local.yml
 
 ---
 
-## Docker 一键启动（推荐）
+## Docker 一键启动（可选）
 
 不需要本地装 JDK / Maven / MySQL / Redis，只要有 Docker 即可。
 
@@ -151,6 +151,10 @@ docker compose down -v         # 停止并清空数据库
 
 > 说明：`schema.sql` / `demo-data.sql` / `demo-records.sql` 只在 **mysql 容器首次创建**时执行。
 > 想重新灌数据需先 `docker compose down -v`。
+
+> **验证状态**：本配置的构建步骤已逐条在开发机上验证过
+> （`mvn package` 可产出可执行 jar、`npm ci` 锁文件一致、compose YAML 合法），
+> 但**未在真实 Docker 环境中完整跑通**。首次使用如遇问题，多半出在镜像构建阶段。
 
 ## 演示账号
 
