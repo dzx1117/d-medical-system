@@ -92,14 +92,28 @@ mysql -uroot -p --default-character-set=utf8mb4 < demo-records.sql # 可选：�
 
 双击 `medical-server/start-redis.bat`（默认端口 6379）
 
-### 3. 启动后端
+### 3. 配置本机数据库连接
+
+数据库地址与密码不写死在代码里，通过 Spring Profile 注入：
+
+```bash
+cd medical-server/src/main/resources
+cp application-local.yml.example application-local.yml
+# 编辑 application-local.yml，填入本机的 MySQL 密码
+```
+
+> `application-local.yml` 已在 `.gitignore` 中，不会被提交。
+
+### 4. 启动后端
 
 双击 `medical-server/start.bat`，看到 `Started MedicalApplication` 即成功。
+
+（该脚本已自动带上 `--spring.profiles.active=local`）
 
 - 接口地址：http://localhost:8080
 - 接口文档：http://localhost:8080/doc.html
 
-### 4. 启动前端
+### 5. 启动前端
 
 双击 `medical-web/start.bat`（首次会自动 `npm install`）
 
