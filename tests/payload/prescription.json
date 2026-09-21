@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "medicineId": 1,
+      "dosage": "1粒",
+      "frequency": "每日3次",
+      "duration": "7天",
+      "quantity": 2
+    },
+    {
+      "medicineId": 6,
+      "dosage": "1粒",
+      "frequency": "每日1次",
+      "duration": "7天",
+      "quantity": 1
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+# ---- Java / Maven ----
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# ---- Node / 前端 ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# ---- IDE ----
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---- 本地工具链（JDK/Maven/Redis，不入库）----
+.tools/
+
+# ---- 界面验证截图 ----
+.shots/
+
+# ---- 本机配置（含数据库密码）----
+application-local.yml
+!.application-local.yml.example
+.env
+
+# ---- 日志与系统文件 ----
+*.log
+logs/
+.DS_Store
+Thumbs.db

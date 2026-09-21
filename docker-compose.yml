@@ -1,0 +1,101 @@
+# ============================================================
+# 智慧医院管理系统 · 一键启动
+#
+#   docker compose up -d --build
+#
+# 启动后访问：
+#   前端      http://localhost
+#   接口文档  http://localhost:8080/doc.html
+#
+# 默认账号： admin / admin123   患者 patient001 / 123456
+#
+# 可在同目录创建 .env 覆盖下面的默认值（尤其是 MYSQL_ROOT_PASSWORD 和 JWT_SECRET）
+# ============================================================
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: medical-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: medical_system
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动时按文件名顺序自动执行
+      - ./medical-server/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./medical-server/src/main/resources/db/demo-data.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro
+      - ./medical-server/src/main/resources/db/demo-records.sql:/docker-entrypoint-initdb.d/03-demo-records.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - medical-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: medical-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - medical-net
+
+  medical-server:
+    build:
+      context: ./medical-server
+      dockerfile: Dockerfile
+    container_name: medical-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: medical_system
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-medical-system-docker-secret-change-me}
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    networks:
+      - medical-net
+
+  medical-web:
+    build:
+      context: ./medical-web
+      dockerfile: Dockerfile
+    container_name: medical-web
+    restart: unless-stopped
+    depends_on:
+      - medical-server
+    ports:
+      - "80:80"
+    networks:
+      - medical-net
+
+volumes:
+  mysql-data:
+
+networks:
+  medical-net:
+    driver: bridge
