@@ -35,4 +35,15 @@ public final class SecurityUtil {
             throw new BusinessException(401, "登录状态异常，请重新登录");
         }
     }
+
+    /**
+     * 未登录时返回 null 而不抛异常的变体，供限流切面等「拿不到用户身份也要能工作」的场景使用。
+     */
+    public static Long getCurrentUserIdOrNull() {
+        try {
+            return getCurrentUserId();
+        } catch (BusinessException e) {
+            return null;
+        }
+    }
 }

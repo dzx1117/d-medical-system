@@ -3,6 +3,7 @@ package com.medical.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.medical.common.BusinessException;
+import com.medical.common.RateLimit;
 import com.medical.common.Result;
 import com.medical.common.SecurityUtil;
 import com.medical.entity.Doctor;
@@ -25,7 +26,11 @@ public class AppointmentController {
 
     /**
      * 患者预约挂号
+     *
+     * <p>限流 5 次 / 10 秒：正常用户一次只挂一个号，连点或脚本刷单会在到达
+     * 分布式锁之前就被拦下，避免无效请求去争抢锁、放大数据库压力。
      */
+    @RateLimit(prefix = "appointment:create", limit = 5, windowSeconds = 10)
     @PostMapping("/create")
     public Result<AppointmentVO> create(@RequestParam Long scheduleId) {
         Long patientId = SecurityUtil.getCurrentUserId();
@@ -35,6 +40,7 @@ public class AppointmentController {
     /**
      * 患者取消预约
      */
+    @RateLimit(prefix = "appointment:cancel", limit = 10, windowSeconds = 60)
     @PostMapping("/cancel/{id}")
     public Result<Void> cancel(@PathVariable Long id) {
         Long patientId = SecurityUtil.getCurrentUserId();
