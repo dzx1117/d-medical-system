@@ -26,13 +26,25 @@ if [ -z "$ATOKEN" ] || [ ${#ATOKEN} -lt 20 ]; then
 fi
 
 # ---------- 创建一条只有 SLOTS 个号源的排班 ----------
-DAY=$(date -d "+17 days" +%Y-%m-%d 2>/dev/null || date -v+17d +%Y-%m-%d)
-curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"doctorId\":1,\"scheduleDate\":\"$DAY\",\"timeSlot\":3,\"totalSlots\":$SLOTS,\"fee\":50,\"status\":1}" >/dev/null
+# 同一医生 + 同一天 + 同一时段不允许重复建排班，而排班一旦被约满就不再出现在可用列表里，
+# 所以从 +17 天开始逐日往后找一个还建得了排班的空闲日期。
+# 这样脚本可以反复执行，不必每次手动清库。
+OFFSET=17
+while :; do
+  DAY=$(date -d "+$OFFSET days" +%Y-%m-%d 2>/dev/null || date -v+"$OFFSET"d +%Y-%m-%d)
+  CREATE=$(curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"doctorId\":1,\"scheduleDate\":\"$DAY\",\"timeSlot\":3,\"totalSlots\":$SLOTS,\"fee\":50,\"status\":1}")
+  echo "$CREATE" | grep -q '"code":200' && break
+  OFFSET=$((OFFSET+1))
+  if [ "$OFFSET" -gt 400 ]; then echo "往后一年都排不出空闲日期，请检查后端"; exit 1; fi
+done
 
+# 取 id 最大的那条，也就是刚刚新建的这条。
+# 不能用 head -1：同一医生同一天可能残留历史排班（按时段排序会把它排到前面），
+# 那样就会拿着别人的号源去抢，成功数自然对不上 SLOTS。
 SCHED_ID=$(curl -s --max-time 20 "$BASE/schedule/available?doctorId=1&scheduleDate=$DAY" \
-  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | cut -d: -f2 | sort -n | tail -1)
 echo "号源 ID = $SCHED_ID   日期 = $DAY"
 echo ""
 

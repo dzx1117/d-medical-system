@@ -42,13 +42,22 @@ echo "[2] 查询号源并预约挂号"
 ATOKEN=$(curl -s --max-time 20 -X POST $BASE/auth/login -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' | sed -E 's/.*"token":"([^"]+)".*/\1/')
 
-DAY=$(date -d "+19 days" +%Y-%m-%d 2>/dev/null || date -v+19d +%Y-%m-%d)
-curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"doctorId\":1,\"scheduleDate\":\"$DAY\",\"timeSlot\":2,\"totalSlots\":3,\"fee\":50,\"status\":1}" >/dev/null
+# 同一医生 + 同一天 + 同一时段不允许重复建排班，所以逐日往后找一个还能建排班的日期，
+# 保证脚本可以反复执行（否则第二次运行会因「已存在排班」而拿不到号源）。
+OFFSET=19
+while :; do
+  DAY=$(date -d "+$OFFSET days" +%Y-%m-%d 2>/dev/null || date -v+"$OFFSET"d +%Y-%m-%d)
+  CREATE=$(curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"doctorId\":1,\"scheduleDate\":\"$DAY\",\"timeSlot\":2,\"totalSlots\":3,\"fee\":50,\"status\":1}")
+  echo "$CREATE" | grep -q '"code":200' && break
+  OFFSET=$((OFFSET+1))
+  if [ "$OFFSET" -gt 400 ]; then echo "往后一年都排不出空闲日期，请检查后端"; exit 1; fi
+done
 
+# 取 id 最大的那条，即刚刚新建的排班：同医生同一天可能残留历史排班，head -1 会取错
 SCHED_ID=$(curl -s --max-time 20 "$BASE/schedule/available?doctorId=1&scheduleDate=$DAY" \
-  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | cut -d: -f2 | sort -n | tail -1)
 
 APPT=$(curl -s --max-time 20 -X POST "$BASE/appointment/create?scheduleId=$SCHED_ID" \
   -H "Authorization: Bearer $PTOKEN")

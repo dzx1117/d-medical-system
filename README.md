@@ -24,20 +24,30 @@
 1. **Redis 分布式锁解决高并发挂号超卖**
    加锁用 `SET key value NX PX ttl` 保证原子性，解锁用 Lua 脚本比对持有者标识避免误删；
    配合数据库 `UPDATE ... WHERE booked_slots < total_slots` 原子更新形成双重防线。
-   实测 20 个并发请求抢 5 个号源，最终 `booked_slots = 5`，无超卖。
+   实测 30 个并发请求抢 5 个号源，最终 `booked_slots = 5`，无超卖。
 
-2. **RBAC 权限模型**
+2. **挂号接口限流（AOP + Redis 原子计数）**
+   自定义 `@RateLimit` 注解 + 切面实现固定窗口限流，默认按「用户」维度计数：
+   单账号 10 秒内最多发起 5 次挂号，超出返回 429。
+   计数与过期时间用一段 Lua 脚本合并成原子操作，避免「自增成功但没来得及设过期」导致永久限流。
+
+3. **JWT 主动失效（Redis 黑名单）**
+   JWT 是无状态的，退出登录若只删前端 token，它在过期前依然可用。
+   这里在退出时把 token 的 SHA-256 摘要写入 Redis 黑名单，TTL 对齐该 token 的剩余有效期
+   （过期即自动清理，不会无限膨胀）；认证过滤器解析 token 后先查黑名单，命中则拒绝认证。
+
+4. **RBAC 权限模型**
    患者 / 医生 / 管理员三种角色。JWT 中携带角色，映射为 `ROLE_PATIENT` /
    `ROLE_DOCTOR` / `ROLE_ADMIN`，配合 `@PreAuthorize` 与 `SecurityConfig` 做接口级鉴权；
    业务层再做数据归属校验（医生只能看自己的患者、患者只能操作自己的预约）。
 
-3. **医疗数据脱敏**
+5. **医疗数据脱敏**
    患者姓名（张三 → 张\*\*）、手机号（138\*\*\*\*8888）、身份证号在接口返回前统一脱敏。
 
-4. **完整业务闭环**
+6. **完整业务闭环**
    挂号 → 就诊 → 病历 → 处方 → 缴费 → 取药，全链路状态机流转，非法状态变更被拦截。
 
-5. **管理数据看板**
+7. **管理数据看板**
    预约总览、未来 7 天就诊负载、科室就诊量排行、医生工作量排行、时段分布。
 
 ## 目录结构
@@ -67,6 +77,7 @@ d-medical-system/
 └── tests/                          # 可重复执行的测试脚本
     ├── e2e-test-flow.sh            # 业务闭环测试
     ├── e2e-test-concurrency.sh     # 并发防超卖测试
+    ├── e2e-test-security.sh        # 退出登录失效 + 接口限流测试
     └── payload/                    # 含中文的 UTF-8 请求体
 ```
 
@@ -172,8 +183,9 @@ docker compose down -v         # 停止并清空数据库
 |------|------|------|
 | 认证 | `POST /auth/login` | 登录，返回 JWT |
 | 认证 | `POST /auth/register` | 患者注册 |
+| 认证 | `POST /auth/logout` | 退出登录（把 token 加入 Redis 黑名单） |
 | 号源 | `GET /schedule/available` | 查询可预约号源 |
-| 预约 | `POST /appointment/create?scheduleId=` | **预约挂号（分布式锁）** |
+| 预约 | `POST /appointment/create?scheduleId=` | **预约挂号（限流 + 分布式锁）** |
 | 预约 | `POST /appointment/cancel/{id}` | 取消预约并释放号源 |
 | 预约 | `POST /appointment/complete/{id}` | 医生确认就诊 |
 | 病历 | `POST /record` | 医生填写病历 |
@@ -225,6 +237,21 @@ bash tests/e2e-test-concurrency.sh
 N=50 SLOTS=10 bash tests/e2e-test-concurrency.sh
 ```
 
+### 3. 安全加固测试
+
+```bash
+bash tests/e2e-test-security.sh
+```
+
+- **退出登录失效**：登录 → 验证 token 可用 → 调用 `/auth/logout` →
+  确认旧 token 访问业务接口与用户信息均返回 401 → 重新登录后新 token 正常
+  （证明黑名单只拉黑那一个 token，没有误伤整个账号）。
+- **接口限流**：连续发起 8 次挂号请求，前 5 次放行、第 6 次起返回 429；
+  等待窗口过期后再次请求恢复放行（证明计数设置了过期，不是永久封禁）。
+
+三个脚本都可以重复执行：每次运行会自动往后找一个还能新建排班的空闲日期，
+不依赖手工清库。
+
 ## 开发提示
 
 **Windows Git Bash 下用 curl 测试接口时**，命令行参数中的中文会被转换成 GBK
@@ -243,3 +270,17 @@ N=50 SLOTS=10 bash tests/e2e-test-concurrency.sh
 | `medical_record` | 电子病历 |
 | `prescription` / `prescription_item` | 处方主表与明细 |
 | `medicine` | 药品字典与库存 |
+
+## 已知限制与后续优化
+
+项目定位是「完整可运行、可讲清楚」的实习作品，以下是清楚知道、尚未处理的部分：
+
+| 限制 | 说明与改进方向 |
+|------|----------------|
+| 分布式锁无自动续期 | 锁固定 10 秒过期，若业务执行超过 10 秒会提前释放。生产可用 Redisson 的看门狗（watchdog）自动续期 |
+| 限流为固定窗口 | 窗口边界处可能出现约 2 倍瞬时流量。可换成令牌桶（`Redis + Lua`）或滑动窗口 |
+| 登录接口未限流 | 目前只给挂号/取消加了限流，登录仍可被暴力尝试。可按「用户名」维度加限流 + 失败次数锁定 |
+| 注册密码策略宽松 | 只校验非空，未限制长度与复杂度 |
+| 无单元测试与 CI | 只有 shell 集成测试；可补 JUnit + Mockito 并接入 GitHub Actions |
+| 缴费为模拟操作 | 未对接真实支付，仅做状态流转 |
+| Docker 配置未实机验证 | 见上文「Docker 一键启动」中的验证状态说明 |
