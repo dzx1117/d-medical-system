@@ -59,7 +59,7 @@ d-medical-system/
 │   │   ├── common/                 # 统一返回、全局异常、Redis 分布式锁、登录用户工具
 │   │   ├── config/                 # MyBatis-Plus / Redis / 跨域 / Knife4j 配置
 │   │   ├── security/               # JWT 工具、认证过滤器、Security 配置
-│   │   ├── entity/  mapper/        # 11 张表的实体与数据访问层（含 StatisticsMapper）
+│   │   ├── entity/  mapper/        # 13 张表的实体与数据访问层（含 StatisticsMapper）
 │   │   ├── dto/  vo/               # 入参与出参模型
 │   │   ├── service/                # 业务层（含 AppointmentTxService 事务边界）
 │   │   └── controller/             # REST 接口
