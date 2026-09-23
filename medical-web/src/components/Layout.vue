@@ -95,8 +95,9 @@ onMounted(async () => {
   }
 })
 
-const logout = () => {
-  userStore.logout()
+const logout = async () => {
+  // 必须等后端把 token 拉黑完成再跳转，否则用户以为退出了、token 其实还有效
+  await userStore.logout()
   router.push('/login')
 }
 </script>

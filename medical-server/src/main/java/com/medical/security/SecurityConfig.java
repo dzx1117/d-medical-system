@@ -37,7 +37,10 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/health", "/doc.html", "/webjars/**",
+                // 只有登录/注册/退出是对外开放的；/auth/info 需要登录，
+                // 放在 anyRequest().authenticated() 里才能返回真正的 HTTP 401
+                .requestMatchers("/auth/login", "/auth/register", "/auth/logout",
+                        "/health", "/doc.html", "/webjars/**",
                         "/swagger-ui/**", "/v3/api-docs/**", "/favicon.ico").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 管理员专属：科室、医生、排班、药品的增删改
