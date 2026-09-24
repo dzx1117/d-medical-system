@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Docker 构建时使用的 Maven 配置（被 Dockerfile COPY 到 /root/.m2/settings.xml）。
+
+  从国内构建时，直连 Maven 中央仓库容易出现下载中断
+  （报 "Premature end of Content-Length delimited message body"），
+  这里把 central 指向阿里云公共仓库，速度更快也更稳定。
+
+  本地开发不受影响：只有 Docker 镜像构建会用到这份配置。
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+  <mirrors>
+    <mirror>
+      <id>aliyun-public</id>
+      <name>Aliyun Public Repository</name>
+      <url>https://maven.aliyun.com/repository/public</url>
+      <!-- 只接管 central，不影响 pom 中声明的其他仓库 -->
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+
+</settings>

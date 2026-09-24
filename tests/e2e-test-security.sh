@@ -71,14 +71,24 @@ echo "[二] 挂号接口限流（${RATE_LIMIT} 次 / ${WINDOW} 秒）"
 ATOKEN=$(curl -s --max-time 20 -X POST $BASE/auth/login -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' | sed -E 's/.*"token":"([^"]+)".*/\1/')
 
-# 造一个全新的号源，避免复用已有预约导致干扰
-DAY=$(date -d "+21 days" +%Y-%m-%d 2>/dev/null || date -v+21d +%Y-%m-%d)
-curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"doctorId\":2,\"scheduleDate\":\"$DAY\",\"timeSlot\":1,\"totalSlots\":50,\"fee\":30,\"status\":1}" >/dev/null
+# 造一个全新的号源，避免复用已有预约导致干扰。
+# 同一医生 + 同一天 + 同一时段不允许重复建排班，所以逐日往后找一个还建得了排班的空闲日期，
+# 保证脚本可以反复执行：复用旧排班的话 patient002 会先撞上「重复预约」，
+# 限流还没触发就被业务逻辑挡掉了，测出来的 429 就不再可信。
+OFFSET=21
+while :; do
+  DAY=$(date -d "+$OFFSET days" +%Y-%m-%d 2>/dev/null || date -v+"$OFFSET"d +%Y-%m-%d)
+  CREATE=$(curl -s --max-time 20 -X POST $BASE/schedule -H "Authorization: Bearer $ATOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"doctorId\":2,\"scheduleDate\":\"$DAY\",\"timeSlot\":1,\"totalSlots\":50,\"fee\":30,\"status\":1}")
+  echo "$CREATE" | grep -q '"code":200' && break
+  OFFSET=$((OFFSET+1))
+  if [ "$OFFSET" -gt 400 ]; then echo "往后一年都排不出空闲日期，请检查后端"; exit 1; fi
+done
 
+# 取 id 最大的那条，即刚刚新建的排班：同医生同一天可能残留历史排班，head -1 会取错
 SCHED_ID=$(curl -s --max-time 20 "$BASE/schedule/available?doctorId=2&scheduleDate=$DAY" \
-  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+  -H "Authorization: Bearer $ATOKEN" | grep -o '"id":[0-9]*' | cut -d: -f2 | sort -n | tail -1)
 echo "         号源ID=$SCHED_ID  规模=${RATE_LIMIT} 次 / ${WINDOW} 秒"
 
 TOTAL=$((RATE_LIMIT + 3))

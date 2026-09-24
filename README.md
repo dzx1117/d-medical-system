@@ -35,6 +35,9 @@
    JWT 是无状态的，退出登录若只删前端 token，它在过期前依然可用。
    这里在退出时把 token 的 SHA-256 摘要写入 Redis 黑名单，TTL 对齐该 token 的剩余有效期
    （过期即自动清理，不会无限膨胀）；认证过滤器解析 token 后先查黑名单，命中则拒绝认证。
+   每个 token 另签发唯一的 `jti`——JWT 载荷里只有秒级的 `iat`，没有它的话同一秒内两次登录
+   会签出**逐字节相同**的字符串，而黑名单按摘要存 key，重新登录拿到的「新」token
+   一出生就会被误判成已拉黑。
 
 4. **RBAC 权限模型**
    患者 / 医生 / 管理员三种角色。JWT 中携带角色，映射为 `ROLE_PATIENT` /
@@ -163,9 +166,13 @@ docker compose down -v         # 停止并清空数据库
 > 说明：`schema.sql` / `demo-data.sql` / `demo-records.sql` 只在 **mysql 容器首次创建**时执行。
 > 想重新灌数据需先 `docker compose down -v`。
 
-> **验证状态**：本配置的构建步骤已逐条在开发机上验证过
-> （`mvn package` 可产出可执行 jar、`npm ci` 锁文件一致、compose YAML 合法），
-> 但**未在真实 Docker 环境中完整跑通**。首次使用如遇问题，多半出在镜像构建阶段。
+> **验证状态**：已在 Ubuntu 20.04 虚拟机中实机跑通 `docker compose up -d --build`——
+> 四个容器全部正常启动（MySQL / Redis 为 `healthy`），前端 `http://localhost` 与接口文档
+> `http://localhost:8080/doc.html` 均返回 200，`tests/` 下三个脚本全部通过
+> （17 项业务闭环 + 30 并发抢 5 号源零超卖 + 12 项安全加固）。
+>
+> 国内网络下构建需要两处镜像加速，均已配好：Docker Hub 走 `registry-mirrors`，
+> Maven 中央仓库走 `medical-server/settings.xml` 中的阿里云镜像。
 
 ## 演示账号
 
@@ -283,4 +290,4 @@ bash tests/e2e-test-security.sh
 | 注册密码策略宽松 | 只校验非空，未限制长度与复杂度 |
 | 无单元测试与 CI | 只有 shell 集成测试；可补 JUnit + Mockito 并接入 GitHub Actions |
 | 缴费为模拟操作 | 未对接真实支付，仅做状态流转 |
-| Docker 配置未实机验证 | 见上文「Docker 一键启动」中的验证状态说明 |
+| Docker 仅单机部署 | 四个服务跑在一台机器上，没有编排、自愈与资源限制。生产可用 K8s / Swarm，并给容器加 `limit` |

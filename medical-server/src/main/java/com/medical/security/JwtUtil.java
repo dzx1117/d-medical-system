@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -24,6 +25,10 @@ public class JwtUtil {
         Date expireDate = new Date(now.getTime() + expiration);
         return JWT.create()
                 .withSubject(String.valueOf(userId))
+                // jti 保证每次签发的 token 都是唯一的。没有它的话，载荷里只有秒级的 iat，
+                // 同一秒内两次登录会签出完全相同的字符串，黑名单按摘要存 key 就会误伤新 token
+                // ——表现为「退出后立刻重新登录，拿到的新 token 一用就 401」。
+                .withJWTId(UUID.randomUUID().toString())
                 .withClaim("username", username)
                 .withClaim("userType", userType)
                 .withIssuedAt(now)
