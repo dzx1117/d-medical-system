@@ -142,23 +142,21 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void payPrescription(Long patientId, Long prescriptionId) {
-        Prescription prescription = getOwnedPrescription(patientId, prescriptionId);
-        if (prescription.getStatus() != 0) {
+        // 归属校验仍然先做：不是本人的处方直接拒绝，不必走到状态更新
+        getOwnedPrescription(patientId, prescriptionId);
+        // 状态校验交给数据库：判断与更新在同一条 SQL 里，并发下只有一个请求能拿到影响行数
+        if (prescriptionMapper.payIfPending(prescriptionId) == 0) {
             throw new BusinessException("当前状态无法缴费");
         }
-        prescription.setStatus(1);
-        prescriptionMapper.updateById(prescription);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void pickupPrescription(Long patientId, Long prescriptionId) {
-        Prescription prescription = getOwnedPrescription(patientId, prescriptionId);
-        if (prescription.getStatus() != 1) {
+        getOwnedPrescription(patientId, prescriptionId);
+        if (prescriptionMapper.pickupIfPaid(prescriptionId) == 0) {
             throw new BusinessException("请先完成缴费");
         }
-        prescription.setStatus(2);
-        prescriptionMapper.updateById(prescription);
     }
 
     private Prescription getOwnedPrescription(Long patientId, Long prescriptionId) {
