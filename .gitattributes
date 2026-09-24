@@ -1,0 +1,15 @@
+# 行尾规则
+#
+# 本仓库在 Windows 上开发、在 Linux 容器里运行，core.autocrlf=true 会把文本文件
+# 检出成 CRLF。对 Java/SQL 没影响，但 .sh 脚本带上 CRLF 拿到 Linux 上跑，
+# bash 会报 "/bin/bash^M: bad interpreter"——^M 是看不见的回车符，很难排查。
+#
+# 所以这几类文件一律固定为 LF（存取都是 LF），不受 autocrlf 影响。
+
+# 这个文件自己也要 LF：行尾带上不可见的 \r 可能让上面的规则匹配失效
+.gitattributes text eol=lf
+
+*.sh       text eol=lf
+Dockerfile text eol=lf
+*.yml      text eol=lf
+*.xml      text eol=lf
