@@ -13,3 +13,14 @@
 Dockerfile text eol=lf
 *.yml      text eol=lf
 *.xml      text eol=lf
+
+# .bat 反过来，必须固定为 CRLF。
+#
+# cmd.exe 是「按当前代码页逐字节」读 .bat 文件的。文件里只要有中文（多字节字符），
+# 配上 LF 行尾，它算行边界就会错位——实测下来，`chcp 65001` 会被拆成两条命令，
+# 之后的每一行全部错位，注释和 echo 里的中文会被当成命令去执行，窗口刷一片
+# "不是内部或外部命令" 然后立刻退出。双击 bat 的人只会看到黑窗口一闪而过。
+#
+# 注意：光把工作区的文件改成 CRLF 不够——仓库里存的仍是 LF，换台机器 clone
+# 出来又会变回 LF。必须在这里固定，才不受 core.autocrlf 影响。
+*.bat      text eol=crlf
