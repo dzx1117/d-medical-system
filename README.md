@@ -5,6 +5,26 @@
 基于 **Spring Boot 3 + Vue 3 + MySQL + Redis** 的医疗信息化管理系统，覆盖
 **预约挂号 → 就诊确认 → 电子病历 → 处方开药 → 缴费取药** 完整业务闭环。
 
+<!-- 推送到 GitHub 后，把下面一行取消注释并把 <owner> 换成你的用户名 -->
+<!-- [![CI](https://github.com/<owner>/d-medical-system/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/d-medical-system/actions/workflows/ci.yml) -->
+
+## 界面预览
+
+| 登录 | 预约挂号 |
+|:---:|:---:|
+| ![登录页](docs/screenshots/01-login.png) | ![预约挂号](docs/screenshots/02-booking.png) |
+
+| 我的预约 | 医生填写病历 |
+|:---:|:---:|
+| ![我的预约](docs/screenshots/03-my-appointments.png) | ![医生病历](docs/screenshots/04-doctor-records.png) |
+
+**管理端数据看板** —— 预约总览 / 未来 7 天就诊负载 / 科室与医生工作量排行 / 时段分布
+
+![数据看板](docs/screenshots/05-dashboard.png)
+
+> 医生页面里患者姓名显示成 `孙**`，不是截图时打的码 —— 那是亮点 6 的脱敏逻辑
+> 在接口返回时真实生效的结果。
+
 ## 技术栈
 
 | 层级 | 技术 | 版本 |

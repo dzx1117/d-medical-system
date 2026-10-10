@@ -1,0 +1,69 @@
+name: CI
+
+# 只跑「不需要外部服务」的检查：
+#   - 后端 26 个 JUnit 单元测试（纯 Mockito，不起 Spring 容器，不连 MySQL / Redis）
+#   - 前端 npm ci + vite build（验证依赖锁文件一致、代码能打包）
+#
+# 那几个依赖真实 MySQL / Redis 的端到端脚本（tests/*.sh）故意没放进来：
+# CI 里要额外起 service 容器、灌数据、等健康检查，慢且脆。
+# 它们仍然是本地手动跑的，README 里写明了哪一层在哪跑。
+#
+# 注意本仓库是 Windows 开发、Linux 运行，.gitattributes 已把 *.yml / *.sh 固定为 LF。
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  backend-test:
+    name: 后端单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          # 缓存 ~/.m2/repository，依赖不变的后续构建从 ~40s 降到几秒
+          cache: maven
+
+      - name: 运行单元测试
+        working-directory: medical-server
+        # -B 关掉进度条与交互，让日志在 CI 里是一行一条
+        run: mvn -B test
+
+      - name: 上传测试报告
+        # 测试失败时也上传，否则只能看控制台输出的摘要
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: medical-server/target/surefire-reports/
+          retention-days: 7
+
+  frontend-build:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: medical-web/package-lock.json
+
+      # 用 ci 而不是 install：严格按 package-lock.json 装，
+      # lock 文件和 package.json 不一致时直接报错，而不是悄悄改掉依赖树
+      - name: 安装依赖
+        working-directory: medical-web
+        run: npm ci
+
+      - name: 构建
+        working-directory: medical-web
+        run: npm run build
