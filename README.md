@@ -5,8 +5,7 @@
 基于 **Spring Boot 3 + Vue 3 + MySQL + Redis** 的医疗信息化管理系统，覆盖
 **预约挂号 → 就诊确认 → 电子病历 → 处方开药 → 缴费取药** 完整业务闭环。
 
-<!-- 推送到 GitHub 后，把下面一行取消注释并把 <owner> 换成你的用户名 -->
-<!-- [![CI](https://github.com/<owner>/d-medical-system/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/d-medical-system/actions/workflows/ci.yml) -->
+[![CI](https://github.com/dzx1117/d-medical-system/actions/workflows/ci.yml/badge.svg)](https://github.com/dzx1117/d-medical-system/actions/workflows/ci.yml)
 
 ## 界面预览
 
